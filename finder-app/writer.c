@@ -16,7 +16,7 @@ int main(int argc, char *args[]) {
 
 	if (argc != 3) {
 		syslog(LOG_ERR, "Please provide writefile and writestr. e.g ./writer <writefile> <writestr>");
-		return -1;
+		return 1;
 	}
 
 	writefile = args[1];
@@ -27,13 +27,13 @@ int main(int argc, char *args[]) {
 	fd = creat(writefile, 0644);
 	if (fd == -1) {
 		syslog(LOG_ERR, "Can not create a file");
-		return -1;
+		return 1;
 	}
 
 	nr = write(fd, writestr, strlen(writestr));
 	if (nr == -1) {
 		syslog(LOG_ERR, "Write failed");
-		return -1;
+		return 1;
 	}
 
 	return 0;
