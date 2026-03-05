@@ -1,4 +1,9 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <wait.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +21,10 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+	int ret;
+	ret = system(cmd);
+	// printf("do_system: %s =  %d\n", cmd, ret); 
+    	return ret == 0;
 }
 
 /**
@@ -45,9 +52,14 @@ bool do_exec(int count, ...)
         command[i] = va_arg(args, char *);
     }
     command[count] = NULL;
+
+    // 0 = /usr/bin/test
+	//    1 = -f
+	//    2 = /bin/echo
+	//    3 = NULL
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    // command[count] = command[count];
 
 /*
  * TODO:
@@ -58,10 +70,43 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+	int status;
+	pid_t pid;
+	pid = fork();
+	//printf("exec: pid = %d\n", pid);
+	if (pid == -1) {
+		return false;
+	}	
 
+	if (pid == 0) {
+		//printf("exec: child pid = %d\n", pid);
+		int ret;
+
+		//char *args[4] = {"/usr/bin/test", "-f", "echo", NULL};
+		// char *args[1] = {"test"};
+		// ret = execv("/bin/echo", args);
+		//ret = execv("/usr/bin/test", args);
+		ret = execv(command[0], command);
+//		printf("exec: execv: cmd = %s; ret = %d\n", command[0], ret);
+		if (ret == -1) {
+//			perror("exec call ret");
+//			printf("exec: execv fail: %d\n", ret);
+			_exit(1);
+		}
+		_exit(0);
+	} else {
+//		printf("exec: parent pid = %d\n", pid);
+	}
+  	
+	pid = wait(&status);	
+	if (pid == -1) {
+		return false;
+	}
+
+//	printf("exec: wait pid = %d; status = %d; WIFEXITED = %d; WEXITSTATUS = %d\n", pid, status, WIFEXITED(status), WEXITSTATUS(status));
     va_end(args);
 
-    return true;
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
 /**
@@ -92,8 +137,50 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    	int fd;
+	int status;
+	pid_t pid;
+
+	fd = creat(outputfile, 0644);
+	if (fd == -1) {
+		perror("creat");
+		return false;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		perror("fork");
+		return false;
+	}
+
+
+	if (pid == 0) {
+		int ret;
+		ret = dup2(fd, STDOUT_FILENO);
+		if (ret < 0) {
+			perror("dup");
+			_exit(1);
+		}
+
+		ret = execv(command[0], command);
+		if (ret == -1) {
+			perror("execv");
+			_exit(1);
+		}
+		_exit(0);
+	}
+	
+
+	pid = wait(&status);
+	if (pid == -1) {
+		perror("wait");
+		close(fd);
+		return false;
+	}
+
+	close(fd);
 
     va_end(args);
 
-    return true;
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
